@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=2]
+
+[ext_resource path="res://res/blue.png" type="Texture" id=1]
+
+[node name="chips_ai" type="Sprite"]
+
+position = Vector2( 10, 10 )
+texture = ExtResource( 1 )
+_sections_unfolded = [ "Transform" ]
+
+
