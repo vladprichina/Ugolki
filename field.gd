@@ -1,6 +1,5 @@
 extends Area2D
 export (PackedScene) var chips
-export (PackedScene) var chips_ai
 onready var cells_render = get_node("cells_render")
 
 # стандартные параметры поля
@@ -28,6 +27,13 @@ class MapArray:
 		if index < array.size():
 			array[index] = value
 		pass
+	
+	func reset():
+		array.clear()
+		for i in (64):
+			array.push_back(CELL_EMPTY) 
+		pass
+	
 		
 	# оценочная функция - для определенного типа игрок1/игрок2 проверяет количество набранных очков
 	func calculate(var figures, var type): 
@@ -93,6 +99,7 @@ func _ready():
 	#загрузка фишек игрока
 	for i in (index_player):
 		var chip = chips.instance()
+		chip.player = true
 		add_child(chip)
 		pos = field_shift + Vector2(i.x * cell_size, i.y * cell_size)
 		chip.position = pos
@@ -103,7 +110,8 @@ func _ready():
 	
 	#загрузка фишек противника
 	for i in (index_ai):
-		var chip = chips_ai.instance()
+		var chip = chips.instance()
+		chip.player = false
 		add_child(chip)
 		pos = field_shift + Vector2(i.x * cell_size, i.y * cell_size)
 		chip.position = pos
@@ -331,6 +339,30 @@ func start_motion(var chip, var array_motion):
 func end_motion():
 	pressed_chip.z_index = pressed_chip.first_index
 	pressed_chip = null
+	pass
+	
+func reset_field():
+	active_cells.clear()
+	cells_render.clear()
+	if pressed_chip:
+		pressed_chip.press()
+		pressed_chip = null
+	
+	var tween = get_node("Tween")
+	var time = 0.5
+	var pos = null
+	var def_scale = Vector2(1,1)
+	
+	cells.reset()
+	
+	for chip in (player_chips):
+		chip.id_cur = chip.id_first
+		cells.set_elem(chip.id_cur.x, chip.id_cur.y, CELL_PLAYER)
+		pos = field_shift + Vector2(chip.id_cur.x * cell_size, chip.id_cur.y * cell_size)
+		tween.interpolate_property(chip, "position", chip.position, pos, time, Tween.TRANS_LINEAR, Tween.EASE_IN)
+		chip.scale = def_scale
+		tween.start()	
+	
 	pass
 
 func _process(delta):

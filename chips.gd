@@ -5,15 +5,21 @@ var intersected = false
 var id_first = Vector2(0,0) setget set_firstID, get_firstID
 var id_cur = id_first setget set_curID, get_curID
 var first_index = 0
+var player = true
 
 onready var sprite = get_node("sprite")
 var spt_normal = preload("res://res/red.png")
 var spt_over = preload("res://res/red_over.png")
 var spt_press = preload("res://res/red_press.png")
+var spt_evil = preload("res://res/blue.png")
 
 func _ready():
-	connect("mouse_entered", self, "over_start")
-	connect("mouse_exited", self, "over_end")
+	if player:
+		connect("mouse_entered", self, "over_start")
+		connect("mouse_exited", self, "over_end")
+	else:
+		sprite.set_texture(spt_evil) 
+		
 	press_state = false;
 	first_index = z_index
 	pass
@@ -48,6 +54,9 @@ func press():
 	pass
 	
 func _input_event(viewport, event, shape_idx):
+	if !player:
+		return
+	
 	if event is InputEventMouseButton \
 	and event.button_index == BUTTON_LEFT \
 	and event.is_pressed():
