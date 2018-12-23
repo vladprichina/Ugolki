@@ -4,6 +4,7 @@ var press_state = false
 var intersected = false
 var id_first = Vector2(0,0) setget set_firstID, get_firstID
 var id_cur = id_first setget set_curID, get_curID
+var first_index = 0
 
 onready var sprite = get_node("sprite")
 var spt_normal = preload("res://res/red.png")
@@ -14,6 +15,7 @@ func _ready():
 	connect("mouse_entered", self, "over_start")
 	connect("mouse_exited", self, "over_end")
 	press_state = false;
+	first_index = z_index
 	pass
 
 func _process(delta):
