@@ -12,7 +12,7 @@ class MapArray:
 	var array = []
 	
 	func _init(var array_new):
-		array = array_new
+		array = array_new.duplicate()
 		pass
 	
 	func get_elem(var x, var y):
@@ -49,12 +49,17 @@ class MapArray:
 		pass
 # ********* end class MapArray ***********
 
-enum { CELL_EMPTY = 0, CELL_PLAYER = 1, CELL_AI = 2 }
+# состояния клеток
+enum { CELL_EMPTY = 0, CELL_PLAYER = -1, CELL_AI = 1 }
 
 var player_chips = []	# фишки игрока
 var ai_chips = []		# фишки противника
 var pressed_chip = null # активная фишка игрока
 var active_cells = []   # возможные варианты шагов игрока
+var step_player = true 	# чей шаг
+var block_press = false
+var find_chip = null
+var depth_ai = 1
 
 # карта для оценки
 var prices = [0,   75,  125, 150, 200, 250, 300, 320,
@@ -62,10 +67,12 @@ var prices = [0,   75,  125, 150, 200, 250, 300, 320,
 			  125, 135, 150, 200, 320, 450, 500, 520,
 			  150, 175, 200, 300, 350, 550, 600, 700,
 			  200, 250, 320, 350, 450, 730, 750, 800,
-			  250, 350, 450, 550, 730, 800, 850, 930,
+			  250, 350, 450, 550, 730, 820, 850, 930,
 			  300, 400, 500, 600, 750, 850, 930, 950,
-			  320, 420, 520, 700, 800, 930, 950, 1000]
+			  320, 420, 520, 700, 800, 930, 990, 1000]
+var prices_invert = prices.duplicate()
 var price_map = MapArray.new(prices)
+var price_map_player = null
 
 # карта текущего расположения объектов
 var cells = null
@@ -89,6 +96,9 @@ var shift_steps = [Vector2(1,0), Vector2(1,1), Vector2(0,1),
 # загрузка начальный данных
 func _ready():
 	var pos = Vector2(0,0)
+	
+	prices_invert.invert()
+	price_map_player = MapArray.new(prices_invert)
 	
 	#загрузка клеток
 	var cells_temp = []
@@ -114,6 +124,8 @@ func _ready():
 		chip.player = false
 		add_child(chip)
 		pos = field_shift + Vector2(i.x * cell_size, i.y * cell_size)
+		chip.id_first = i
+		chip.id_cur = i
 		chip.position = pos
 		cells.set_elem(i.x, i.y, CELL_AI)
 		ai_chips.push_back(chip)
@@ -128,6 +140,9 @@ func _ready():
 	
 # обработчик клика по фишке игрока
 func click_player(var chip):
+	if block_press:
+		return
+	
 	if pressed_chip == null:
 		pressed_chip = chip
 		pressed_chip.press()
@@ -196,10 +211,7 @@ func get_path(var chip_index, var chip_find, var map, var steps, var recursive, 
 	# бегаем по всем направлениям
 	for shift in (shift_steps):
 		array.clear()
-		
-		if chip_index == Vector2(7,4):
-			var vlad = 0
-		
+
 		new_pos = chip_index + shift
 		if steps.find(new_pos) != -1:
 			continue
@@ -276,13 +288,13 @@ func click_field(var position):
 		pos += field_shift + Vector2(i.x * cell_size, i.y * cell_size)
 		# если кликнули по клетке, в которую можем походить, - ходим
 		if is_point_inside_circle(position, pos, 50):
-			player_step(i)
+			new_step(i, CELL_PLAYER, pressed_chip)
 			break
 	
 	pass
 
 # шаг игрока
-func player_step(var index):
+func new_step(var index, var ai, var chip):
 	# выключаем подсветку клеток
 	active_cells.clear()
 	cells_render.clear()
@@ -290,17 +302,17 @@ func player_step(var index):
 	# расчет и начало перемещения
 	var array_motion = []
 	var buf = []
-	get_path(pressed_chip.id_cur, index, cells, active_cells, false, buf, array_motion)
-	start_motion(pressed_chip, array_motion)
+	get_path(chip.id_cur, index, cells, active_cells, false, buf, array_motion)
+	start_motion(chip, array_motion)
 	
 	# обновление параметров
-	cells.set_elem(pressed_chip.id_cur.x, pressed_chip.id_cur.y, CELL_EMPTY)
-	pressed_chip.id_cur = index
-	cells.set_elem(pressed_chip.id_cur.x, pressed_chip.id_cur.y, CELL_PLAYER)
+	cells.set_elem(chip.id_cur.x, chip.id_cur.y, CELL_EMPTY)
+	chip.id_cur = index
+	cells.set_elem(chip.id_cur.x, chip.id_cur.y, ai)
 	
 	active_cells.clear()
-	pressed_chip.press()
-	#pressed_chip = null
+	if ai == CELL_PLAYER:
+		chip.press()
 	pass
 	
 # ******* класс для сортировки, используется как предикат для сравнения длинн массивов
@@ -333,12 +345,21 @@ func start_motion(var chip, var array_motion):
 	tween.interpolate_callback(self, delay, "end_motion")
 	tween.start()	
 	chip.z_index = 1000
+	block_press = true
 
 	pass
 	
 func end_motion():
-	pressed_chip.z_index = pressed_chip.first_index
+	if pressed_chip:
+		pressed_chip.z_index = pressed_chip.first_index
 	pressed_chip = null
+	step_player = !step_player
+	
+	block_press = false
+	
+	if !step_player:
+		ai_step()
+	
 	pass
 	
 func reset_field():
@@ -362,9 +383,97 @@ func reset_field():
 		tween.interpolate_property(chip, "position", chip.position, pos, time, Tween.TRANS_LINEAR, Tween.EASE_IN)
 		chip.scale = def_scale
 		tween.start()	
+		
+	for chip in (ai_chips):
+		chip.id_cur = chip.id_first
+		cells.set_elem(chip.id_cur.x, chip.id_cur.y, CELL_AI)
+		pos = field_shift + Vector2(chip.id_cur.x * cell_size, chip.id_cur.y * cell_size)
+		tween.interpolate_property(chip, "position", chip.position, pos, time, Tween.TRANS_LINEAR, Tween.EASE_IN)
+		chip.scale = def_scale
+		tween.start()	
 	
 	pass
 
 func _process(delta):
 	
 	pass
+	
+func price_for_node(var node, var ai):
+	if ai == CELL_PLAYER:
+		return price_map_player.calculate(node, ai)
+		
+	return price_map.calculate(node, ai)
+	pass	
+
+func simulate_step(var step, var chip, var node, var ai):
+	node.set_elem(chip.id_next.x, chip.id_next.y, CELL_EMPTY)
+	node.set_elem(step.x, step.y, ai)
+	pass
+
+func desimulate_step(var step, var chip, var node, var ai):
+	node.set_elem(step.x, step.y, ai)
+	node.set_elem(chip.id_next.x, chip.id_next.y, CELL_EMPTY)
+	pass
+
+func negamax(var node, var depth, var a, var b, var ai):
+	if depth == 0:
+        return ai * price_for_node(node, ai)
+	
+	# выбор стороны
+	var test_array = ai_chips 
+	if ai == -1:
+		test_array = player_chips
+	
+	# берем все возможные фишки и их шаги
+	var value = -9999
+	var result = null
+	for chip in (test_array):
+		var steps = []
+		get_steps(chip.id_next, node, steps, false)
+		for step in (steps):
+			var last_step = chip.id_next
+			simulate_step(step, chip, node, ai)
+	
+			value = price_for_node(node, ai)
+			
+			# TODO - разобраться со ссылками и сделать через простую замену, ускорит в разы
+			var cell_buf = node.array.duplicate()
+			var cells_test = MapArray.new(cell_buf)
+			
+			var new_value = -negamax(cells_test, depth - 1, -b, -a, -ai)
+		
+			chip.id_next = step
+			desimulate_step(last_step, chip, node, ai)
+			chip.id_next = last_step
+			
+			value = max(value, new_value)
+			
+			if a < value and depth == depth_ai:
+				result = chip
+				result.id_final = step
+				
+			a = max(a, value)
+			if a >= b:
+				break 
+		pass 
+	pass
+	   
+	find_chip = result
+	return value
+	pass
+
+func ai_step():
+	var depth = 0
+	depth = depth_ai
+	
+	var cell_buf = cells.array.duplicate()
+	var cells_test = MapArray.new(cell_buf)
+	negamax(cells_test, depth, -9999, 9999, CELL_AI)
+	var final_id = find_chip.id_final
+	new_step(final_id, CELL_AI, find_chip)
+	pressed_chip = find_chip
+	pass
+	
+
+
+

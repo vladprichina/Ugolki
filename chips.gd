@@ -2,8 +2,10 @@ extends Area2D
 
 var press_state = false
 var intersected = false
-var id_first = Vector2(0,0) setget set_firstID, get_firstID
+var id_first = Vector2(0,0) setget set_firstID, get_firstID		# нужна для сброса
 var id_cur = id_first setget set_curID, get_curID
+var id_next = id_first	# нужна для поиска пути
+var id_final = id_next
 var first_index = 0
 var player = true
 
@@ -77,6 +79,7 @@ func get_firstID():
 	
 func set_curID(new_value):
 	id_cur = new_value
+	id_next = id_cur
 	pass
 
 func get_curID():

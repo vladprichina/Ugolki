@@ -16,7 +16,7 @@ custom_solver_bias = 0.0
 extents = Vector2( 400, 400 )
 _sections_unfolded = [ "Resource" ]
 
-[node name="main_node" type="Node" index="0"]
+[node name="main_node" type="Node"]
 
 [node name="game_node" type="Node" parent="." index="0"]
 
