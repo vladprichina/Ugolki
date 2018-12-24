@@ -24,8 +24,6 @@ script = ExtResource( 1 )
 
 [node name="gui" type="Node" parent="game_node" index="0"]
 
-editor/display_folded = true
-
 [node name="fon" type="Sprite" parent="game_node/gui" index="0"]
 
 position = Vector2( 644.536, 397.641 )
@@ -47,8 +45,6 @@ mouse_default_cursor_shape = 0
 size_flags_horizontal = 1
 size_flags_vertical = 4
 size_flags_stretch_ratio = 4.0
-text = "Step counter: 0
-"
 align = 1
 valign = 1
 uppercase = true
@@ -71,8 +67,6 @@ mouse_filter = 2
 mouse_default_cursor_shape = 0
 size_flags_horizontal = 1
 size_flags_vertical = 4
-text = "Step: white
-"
 align = 1
 valign = 1
 uppercase = true
@@ -139,7 +133,7 @@ playback/speed = 1.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="game_node/field" index="1"]
 
-position = Vector2( 400, 400 )
+position = Vector2( 400, 399 )
 shape = SubResource( 1 )
 _sections_unfolded = [ "Material", "Pause", "Transform", "Visibility", "Z Index" ]
 

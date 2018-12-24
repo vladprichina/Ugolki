@@ -54,6 +54,7 @@ enum { CELL_EMPTY = 0, CELL_PLAYER = -1, CELL_AI = 1 }
 
 const INVALID_VECTOR = Vector2(-1, -1)
 var last_step = INVALID_VECTOR
+var step_counter = 0
 
 var player_chips = []	# фишки игрока
 var ai_chips = []		# фишки противника
@@ -132,6 +133,9 @@ func _ready():
 		chip.position = pos
 		cells.set_elem(i.x, i.y, CELL_AI)
 		ai_chips.push_back(chip)
+
+	set_step_text()
+	set_counter_text()
 
 	pass
 	
@@ -373,12 +377,17 @@ func end_ai_motion():
 	pressed_chip = null		
 	step_player = true
 	block_press = false
+	step_counter += 1
+	set_counter_text()
+	set_step_text()
 	pass
 	
 func reset_field():
 	block_press = false
+	step_counter = 0
 	active_cells.clear()
 	cells_render.clear()
+	step_player = true
 	last_step = INVALID_VECTOR
 	if pressed_chip:
 		pressed_chip.press()
@@ -407,6 +416,20 @@ func reset_field():
 		tween.interpolate_property(chip, "position", chip.position, pos, time, Tween.TRANS_LINEAR, Tween.EASE_IN)
 		chip.scale = def_scale
 		tween.start()	
+		
+	set_counter_text()
+	pass
+	
+func set_counter_text():
+	var gui_step_counter = get_node("/root/main_node/game_node/gui/step_cnt_text")
+	var text = "STEP COUNTER: " + String(step_counter)
+	gui_step_counter.text = text
+	pass
+
+func set_step_text():
+	var gui_step = get_node("/root/main_node/game_node/gui/step_text")
+	var text = "STEP: RED" if step_player else "STEP: BLUE"
+	gui_step.text = text
 	
 	pass
 
@@ -485,8 +508,9 @@ func ai_step():
 	pressed_chip = find_chip
 	active_cells.clear()
 	cells_render.clear()
-	pass
 	
+	set_step_text()
+	pass
 
 
 
