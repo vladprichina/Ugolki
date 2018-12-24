@@ -52,6 +52,9 @@ class MapArray:
 # состояния клеток
 enum { CELL_EMPTY = 0, CELL_PLAYER = -1, CELL_AI = 1 }
 
+const INVALID_VECTOR = Vector2(-1, -1)
+var last_step = INVALID_VECTOR
+
 var player_chips = []	# фишки игрока
 var ai_chips = []		# фишки противника
 var pressed_chip = null # активная фишка игрока
@@ -59,7 +62,7 @@ var active_cells = []   # возможные варианты шагов игр�
 var step_player = true 	# чей шаг
 var block_press = false
 var find_chip = null
-var depth_ai = 1
+var depth_ai = 1 # количество ветвей в алгоритме расчета шагов (ходAi->ходИгрока->ходAi)
 
 # карта для оценки
 var prices = [0,   75,  125, 150, 200, 250, 300, 320,
@@ -129,27 +132,28 @@ func _ready():
 		chip.position = pos
 		cells.set_elem(i.x, i.y, CELL_AI)
 		ai_chips.push_back(chip)
+
 	pass
 	
-	# закомментировать, для теста оценочной функции
-	var price_player = price_map.calculate(cells, CELL_PLAYER)
-	var price_ai = price_map.calculate(cells, CELL_AI)
-	var x = 0
-	
-	pass
-	
-# обработчик клика по фишке игрока
+# обработчик клика по фишке
 func click_player(var chip):
 	if block_press:
 		return
-	
+			
 	if pressed_chip == null:
 		pressed_chip = chip
 		pressed_chip.press()
 	elif pressed_chip == chip:
 		pressed_chip.press()
 		pressed_chip = null
+		if last_step != INVALID_VECTOR:
+			last_step = INVALID_VECTOR
+			step_player = !step_player
+			ai_step()
 	else:
+		if last_step != INVALID_VECTOR:
+			new_step(last_step, CELL_PLAYER, pressed_chip)
+		last_step = INVALID_VECTOR
 		pressed_chip.press()
 		pressed_chip = chip
 		pressed_chip.press()
@@ -158,7 +162,8 @@ func click_player(var chip):
 	if pressed_chip != null:
 		get_steps(pressed_chip.id_cur, cells, active_cells, false)
 		
-	activate_cells()
+	if step_player:
+		activate_cells()
 	pass
 	
 # получить все шаги (TODO, можно оптимизировать перебирая только ходы в сторону противника)
@@ -283,11 +288,16 @@ func _input_event(viewport, event, shape_idx):
 # обработчик клика по полю
 func click_field(var position):
 	
+	# не даем походить, если уже походили, можем только вернутся или дать шаг противнику
+	if last_step != INVALID_VECTOR:
+		return
+	
 	for i in (active_cells):
 		var pos = Vector2(240,0)
 		pos += field_shift + Vector2(i.x * cell_size, i.y * cell_size)
 		# если кликнули по клетке, в которую можем походить, - ходим
 		if is_point_inside_circle(position, pos, 50):
+			last_step = pressed_chip.id_cur
 			new_step(i, CELL_PLAYER, pressed_chip)
 			break
 	
@@ -311,8 +321,6 @@ func new_step(var index, var ai, var chip):
 	cells.set_elem(chip.id_cur.x, chip.id_cur.y, ai)
 	
 	active_cells.clear()
-	if ai == CELL_PLAYER:
-		chip.press()
 	pass
 	
 # ******* класс для сортировки, используется как предикат для сравнения длинн массивов
@@ -342,7 +350,8 @@ func start_motion(var chip, var array_motion):
 		delay += time
 		pass
 	
-	tween.interpolate_callback(self, delay, "end_motion")
+	var callback = "end_motion" if step_player else "end_ai_motion"
+	tween.interpolate_callback(self, delay, callback)
 	tween.start()	
 	chip.z_index = 1000
 	block_press = true
@@ -350,21 +359,26 @@ func start_motion(var chip, var array_motion):
 	pass
 	
 func end_motion():
-	if pressed_chip:
-		pressed_chip.z_index = pressed_chip.first_index
-	pressed_chip = null
-	step_player = !step_player
-	
+	pressed_chip.z_index = pressed_chip.first_index
+		
+	if last_step != INVALID_VECTOR:
+		get_steps(pressed_chip.id_cur, cells, active_cells, false)
+		activate_cells()
+
 	block_press = false
+	pass
 	
-	if !step_player:
-		ai_step()
-	
+func end_ai_motion():
+	pressed_chip.z_index = pressed_chip.first_index
+	pressed_chip = null		
+	step_player = true
+	block_press = false
 	pass
 	
 func reset_field():
 	active_cells.clear()
 	cells_render.clear()
+	last_step = INVALID_VECTOR
 	if pressed_chip:
 		pressed_chip.press()
 		pressed_chip = null
@@ -394,10 +408,7 @@ func reset_field():
 	
 	pass
 
-func _process(delta):
-	
-	pass
-	
+# цена текущего состояния для игрока или ai
 func price_for_node(var node, var ai):
 	if ai == CELL_PLAYER:
 		return price_map_player.calculate(node, ai)
@@ -434,13 +445,9 @@ func negamax(var node, var depth, var a, var b, var ai):
 			var last_step = chip.id_next
 			simulate_step(step, chip, node, ai)
 	
+			# оценка шагов
 			value = price_for_node(node, ai)
-			
-			# TODO - разобраться со ссылками и сделать через простую замену, ускорит в разы
-			var cell_buf = node.array.duplicate()
-			var cells_test = MapArray.new(cell_buf)
-			
-			var new_value = -negamax(cells_test, depth - 1, -b, -a, -ai)
+			var new_value = -negamax(node, depth - 1, -b, -a, -ai)
 		
 			chip.id_next = step
 			desimulate_step(last_step, chip, node, ai)
@@ -448,6 +455,7 @@ func negamax(var node, var depth, var a, var b, var ai):
 			
 			value = max(value, new_value)
 			
+			# запоминаем лучший шаг в самой верхней ноде
 			if a < value and depth == depth_ai:
 				result = chip
 				result.id_final = step
@@ -462,6 +470,7 @@ func negamax(var node, var depth, var a, var b, var ai):
 	return value
 	pass
 
+# ход AI
 func ai_step():
 	var depth = 0
 	depth = depth_ai
@@ -472,6 +481,8 @@ func ai_step():
 	var final_id = find_chip.id_final
 	new_step(final_id, CELL_AI, find_chip)
 	pressed_chip = find_chip
+	active_cells.clear()
+	cells_render.clear()
 	pass
 	
 
