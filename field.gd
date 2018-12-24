@@ -376,6 +376,7 @@ func end_ai_motion():
 	pass
 	
 func reset_field():
+	block_press = false
 	active_cells.clear()
 	cells_render.clear()
 	last_step = INVALID_VECTOR
@@ -384,6 +385,7 @@ func reset_field():
 		pressed_chip = null
 	
 	var tween = get_node("Tween")
+	tween.stop_all()
 	var time = 0.5
 	var pos = null
 	var def_scale = Vector2(1,1)
