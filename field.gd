@@ -7,7 +7,7 @@ const field_size = 8
 const field_shift = Vector2(60, 60)
 const cell_size = 97
 
-# ********* class MapArray ***********
+# ********* class MapArray (нужен для работы с одномерным массивом как с матрицей) ***********
 class MapArray:
 	var array = []
 	
@@ -63,7 +63,7 @@ var active_cells = []   # возможные варианты шагов игр�
 var step_player = true 	# чей шаг
 var block_press = false
 var find_chip = null
-var depth_ai = 1 # количество ветвей в алгоритме расчета шагов (ходAi->ходИгрока->ходAi)
+var depth_ai = 2 # количество ветвей в алгоритме расчета шагов (ходAi->ходИгрока->ходAi)
 
 # карта для оценки
 var prices = [0,   75,  125, 150, 200, 250, 300, 320,
@@ -446,9 +446,10 @@ func simulate_step(var step, var chip, var node, var ai):
 	node.set_elem(step.x, step.y, ai)
 	pass
 
-func desimulate_step(var step, var chip, var node, var ai):
-	node.set_elem(step.x, step.y, ai)
-	node.set_elem(chip.id_next.x, chip.id_next.y, CELL_EMPTY)
+func desimulate_step(var cur_step, var last_step, var chip, var node, var ai):
+	node.set_elem(last_step.x, last_step.y, ai)
+	node.set_elem(cur_step.x, cur_step.y, CELL_EMPTY)
+	chip.id_next = last_step
 	pass
 
 func negamax(var node, var depth, var a, var b, var ai):
@@ -456,11 +457,9 @@ func negamax(var node, var depth, var a, var b, var ai):
         return ai * price_for_node(node, ai)
 	
 	# выбор стороны
-	var test_array = ai_chips 
-	if ai == -1:
-		test_array = player_chips
+	var test_array = ai_chips if ai == 1 else player_chips
 	
-	# берем все возможные фишки и их шаги
+	# берем все возможные фишки и их шаги1
 	var value = -9999
 	var result = null
 	for chip in (test_array):
@@ -469,17 +468,11 @@ func negamax(var node, var depth, var a, var b, var ai):
 		for step in (steps):
 			var last_step = chip.id_next
 			simulate_step(step, chip, node, ai)
-	
 			# оценка шагов
-			value = price_for_node(node, ai)
 			var new_value = -negamax(node, depth - 1, -b, -a, -ai)
-		
-			chip.id_next = step
-			desimulate_step(last_step, chip, node, ai)
-			chip.id_next = last_step
+			desimulate_step(step, last_step, chip, node, ai)
 			
 			value = max(value, new_value)
-			
 			# запоминаем лучший шаг в самой верхней ноде
 			if a < value and depth == depth_ai:
 				result = chip
@@ -487,7 +480,8 @@ func negamax(var node, var depth, var a, var b, var ai):
 				
 			a = max(a, value)
 			if a >= b:
-				break 
+				find_chip = result
+				return value
 		pass 
 	pass
 	   
@@ -499,10 +493,7 @@ func negamax(var node, var depth, var a, var b, var ai):
 func ai_step():
 	var depth = 0
 	depth = depth_ai
-	
-	var cell_buf = cells.array.duplicate()
-	var cells_test = MapArray.new(cell_buf)
-	negamax(cells_test, depth, -9999, 9999, CELL_AI)
+	negamax(cells, depth, -9999, 9999, CELL_AI)
 	var final_id = find_chip.id_final
 	new_step(final_id, CELL_AI, find_chip)
 	pressed_chip = find_chip
