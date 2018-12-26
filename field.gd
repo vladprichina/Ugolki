@@ -143,18 +143,28 @@ func _ready():
 func click_player(var chip):
 	if block_press:
 		return
-			
+		
+	# если выделили первую фишку	
 	if pressed_chip == null:
 		pressed_chip = chip
 		pressed_chip.press()
+		
+	# если нажали на ту же фишку
 	elif pressed_chip == chip:
 		pressed_chip.press()
 		pressed_chip = null
+		
 		if last_step != INVALID_VECTOR:
 			last_step = INVALID_VECTOR
 			step_player = !step_player
-			ai_step()
+			
+			if check_for_win_player():
+				var dialog = get_node("/root/main_node/win_dialog/Panel")
+				dialog.show()
+			else:
+				ai_step()
 	else:
+	# если выделили новую фишку
 		if last_step != INVALID_VECTOR:
 			new_step(last_step, CELL_PLAYER, pressed_chip)
 		last_step = INVALID_VECTOR
@@ -368,7 +378,7 @@ func end_motion():
 	if last_step != INVALID_VECTOR:
 		get_steps(pressed_chip.id_cur, cells, active_cells, false)
 		activate_cells()
-
+		
 	block_press = false
 	pass
 	
@@ -380,18 +390,51 @@ func end_ai_motion():
 	step_counter += 1
 	set_counter_text()
 	set_step_text()
+	
+	if check_for_win_ai():
+		reset_field()
+	
 	pass
 	
+# проверка на победу игрока
+func check_for_win_player():
+	for index in (index_ai):
+		if cells.get_elem(index.x, index.y) != CELL_PLAYER:
+			return false
+	
+	return true
+	
+	
+# проверка на победу АИ
+func check_for_win_ai():
+	for index in (index_player):
+		if cells.get_elem(index.x, index.y) != CELL_AI:
+			return false
+	
+	return true
+	
+func save():
+	var name = get_node("/root/main_node/win_dialog/Panel/edit")
+	
+	var save_dict = {
+	"name" : name.text,
+	"count" : step_counter,
+	"lost" : 0
+	}
+	return save_dict
+	
 func reset_field():
+	if pressed_chip:
+		if step_player:
+			pressed_chip.press()
+		pressed_chip = null
+	
 	block_press = false
 	step_counter = 0
 	active_cells.clear()
 	cells_render.clear()
 	step_player = true
 	last_step = INVALID_VECTOR
-	if pressed_chip:
-		pressed_chip.press()
-		pressed_chip = null
 	
 	var tween = get_node("Tween")
 	tween.stop_all()
