@@ -26,9 +26,6 @@ func _ready():
 	first_index = z_index
 	pass
 
-func _process(delta):
-	pass
-	
 func set_state(var normal = true):
 	if normal:
 		if !press_state:
