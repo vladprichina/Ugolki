@@ -18,7 +18,7 @@ func add_item(var name, var counter, var lost_step):
 # ******* класс для сортировки
 class MyCustomSorterRating:
 	static func sort(a, b):
-		if a["count"] < b["count"]:
+		if a["lost"] > b["lost"]:
 			return true
 		return false
 		pass

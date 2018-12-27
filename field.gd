@@ -303,7 +303,7 @@ func _input_event(viewport, event, shape_idx):
 func click_field(var position):
 	
 	# не даем походить, если уже походили, можем только вернутся или дать шаг противнику
-	if last_step != INVALID_VECTOR:
+	if last_step != INVALID_VECTOR or !pressed_chip:
 		return
 	
 	for i in (active_cells):
@@ -412,14 +412,57 @@ func check_for_win_ai():
 			return false
 	
 	return true
+
+
+# опрежение - количество шагов нужных для победы
+func find_losted(var node, var ai):
+	if check_for_win_ai():
+		return 0
 	
+	
+	# выбор стороны
+	var test_array = ai_chips if ai == 1 else player_chips
+	var value = -9999
+	var result_chip = null
+	var result_step = null
+	
+	# берем все возможные фишки и их шаги
+	for chip in (test_array):
+		var steps = []
+		get_steps(chip.id_next, node, steps, false)
+		for step in (steps):
+			# оценка шагов
+			var last_step = chip.id_next
+			simulate_step(step, chip, node, ai)
+			var temp = ai * price_for_node(node, ai)
+			desimulate_step(step, last_step, chip, node, ai)
+			if temp > value:
+				value = temp
+				result_chip = chip
+				result_step = step
+		pass 
+	pass
+	   
+	if result_chip:
+		simulate_step(result_step, result_chip, node, ai)
+		result_chip.id_next = result_step
+		var x = find_losted(node, ai)
+		return x + 1
+	
+	return 0
+	pass
+
+
 func save():
 	var name = get_node("/root/main_node/win_dialog/Panel/edit")
+	
+	# считаем опережение
+	var lost = find_losted(cells, CELL_AI)
 	
 	var save_dict = {
 	"name" : name.text,
 	"count" : step_counter,
-	"lost" : 0
+	"lost" : lost
 	}
 	return save_dict
 	
